@@ -8,50 +8,25 @@ import 'package:path_provider/path_provider.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xlsio;
-import 'home_page.dart'; 
 
 // import 'package:permission_handler/permission_handler.dart'; // Add this for permissions
-// import 'package:excel/excel.dart';
 
 // const apiEndpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?';
 const apikey = 'AIzaSyCk3FI25_MTfUzrbvgYHKauG-y_Dacobt4';
-
-// Access your API key as an environment variable (see "Set up your API key" above)
 final apiKey = apikey; //Platform.environment['API_KEY'];
-// if (apiKey == null) {
-//   print('No \$API_KEY environment variable');
-//   exit(1);a
-// }
+
 
 final model = GenerativeModel(
   model: 'gemini-1.5-flash',
   apiKey: apiKey,
 );
 
-void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-  runApp(MyApp());
-}
-
-class MyApp extends StatelessWidget {
+class CreateRosterPage extends StatefulWidget {
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Gemini API Demo',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: HomePage(),
-    );
-  }
+  _CreateRosterPageState createState() => _CreateRosterPageState();
 }
 
-class HomePage extends StatefulWidget {
-  @override
-  _HomePageState createState() => _HomePageState();
-}
-
-class _HomePageState extends State<HomePage> {
+class _CreateRosterPageState extends State<CreateRosterPage> {
   // final TextEditingController _controller = TextEditingController();
   final TextEditingController _eventFrequencyController = TextEditingController();
   final TextEditingController _startDateController = TextEditingController();
