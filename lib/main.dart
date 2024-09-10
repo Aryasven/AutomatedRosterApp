@@ -19,7 +19,7 @@ const apikey = 'AIzaSyCk3FI25_MTfUzrbvgYHKauG-y_Dacobt4';
 final apiKey = apikey; //Platform.environment['API_KEY'];
 // if (apiKey == null) {
 //   print('No \$API_KEY environment variable');
-//   exit(1);
+//   exit(1);a
 // }
 
 final model = GenerativeModel(
@@ -51,17 +51,31 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final TextEditingController _controller = TextEditingController();
+  // final TextEditingController _controller = TextEditingController();
+  final TextEditingController _eventFrequencyController = TextEditingController();
+  final TextEditingController _startDateController = TextEditingController();
+  final TextEditingController _endDateController = TextEditingController();
+  final TextEditingController _volunteerNamesController = TextEditingController();
   String _response = '';
   bool _loading = false;
 
-  Future<void> _callGeminiApi(String prompt) async {
+  Future<void> _callGeminiApi(String eventFrequency, String startDate, String endDate, List<String> volunteerNames) async {
     setState(() {
       _loading = true;
     });
 
     try {
-        prompt = "Can you create a roster for me from a list of 10 names for every sunday, starting september 8th, to december end.  There are 3 roles every sunday (09:00 am, 11:00am and 05:00pm). Try to do equal distributions. Make up your names for now. Respond with ONLY a json as output and no other explanation.";
+        // Construct the prompt using user inputs
+        String prompt = '''
+          Can you create a roster for the following volunteering event? 
+
+          Event Frequency: $eventFrequency
+          Start Date: $startDate
+          End Date: $endDate
+          Volunteer Names: ${volunteerNames.join(', ')}
+
+          Try to do equal distributions. Respond with ONLY a JSON as output and no other explanation.
+        ''';
         final response = await model.generateContent([Content.text(prompt)]);
         String responseBody = response.text!;
         // Display the response on the webpage
@@ -87,61 +101,67 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _saveResponseToFile(dynamic responseBody) async {
-    // DartPluginRegistrant.ensureInitialized();
-    // WidgetsFlutterBinding.ensureInitialized();
-    var path = "/assets";
-    if (!kIsWeb) {
-      var directory = await getApplicationDocumentsDirectory();
-      path = directory.path;
-    }
-    // final directory = await getApplicationDocumentsDirectory();
-    final filePath = '${path}/response.json';
-    final file = File(filePath);
-
-    try {
-      await file.writeAsString(jsonEncode(responseBody));
-      setState(() {
-        _response += '\n\nResponse saved to: $filePath';
-      });
-    } catch (e) {
-      setState(() {
-        _response += '\n\nError saving response: $e';
-      });
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Gemini API Demo'),
+        title: Text('Automated roster creation'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
             TextField(
-              controller: _controller,
+              controller: _eventFrequencyController,
               decoration: InputDecoration(
                 border: OutlineInputBorder(),
-                labelText: 'Enter your prompt',
+                labelText: 'Event Frequency',
               ),
             ),
-            SizedBox(height: 16),
+            SizedBox(height: 12),
+            TextField(
+              controller: _startDateController,
+              decoration: InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'Start Date',
+              ),
+            ),
+            SizedBox(height: 12),
+            TextField(
+              controller: _endDateController,
+              decoration: InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'End Date',
+              ),
+            ),
+            SizedBox(height: 12),
+            TextField(
+              controller: _volunteerNamesController,
+              decoration: InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'Volunteer Names (comma separated)',
+              ),
+            ),
+            SizedBox(height: 12),
             ElevatedButton(
               onPressed: _loading ? null : () {
-                _callGeminiApi(_controller.text);
+                // Convert comma-separated names into a list
+                List<String> volunteerNames = _volunteerNamesController.text.split(',').map((name) => name.trim()).toList();
+
+                _callGeminiApi(
+                  _eventFrequencyController.text,
+                  _startDateController.text,
+                  _endDateController.text,
+                  volunteerNames
+                );
               },
               child: _loading ? CircularProgressIndicator() : Text('Send'),
             ),
-            SizedBox(height: 16),
+            SizedBox(height: 12),
             Expanded(
               child: SingleChildScrollView(
-                child: Text(
-                  _response,
-                  style: TextStyle(fontSize: 16),
-                ),
+                child: ResponseDisplayBox(response: _response),
               ),
             ),
           ],
@@ -149,6 +169,7 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+
 
 
   Future<void> _writeJsonToExcel() async {
@@ -180,7 +201,8 @@ class _HomePageState extends State<HomePage> {
               sheet.getRangeByIndex(row, i + 1).setText(keysList[i].trim());
             }
             // Set the last column to the value
-            sheet.getRangeByIndex(row, keysList.length + 1).setText(value.toString());
+            sheet.getRangeByIndex(row, keysList.length + 1).setText('$key');
+            sheet.getRangeByIndex(row, keysList.length + 2).setText(value.toString());
 
             row++;
           }
@@ -217,6 +239,7 @@ class ResponseDisplayBox extends StatelessWidget {
   ResponseDisplayBox({required this.response});
 
   @override
+
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.all(16.0),
@@ -232,37 +255,3 @@ class ResponseDisplayBox extends StatelessWidget {
     );
   }
 }
-
-/// Function to find the depth (layers) of a nested map.
-int findMapDepth(Map<dynamic, dynamic> map) {
-  int maxDepth = 1;
-
-  for (var value in map.values) {
-    if (value is Map) {
-      // Recursively find the depth of the nested map and compare it to maxDepth
-      int currentDepth = 1 + findMapDepth(value);
-      if (currentDepth > maxDepth) {
-        maxDepth = currentDepth;
-      }
-    }
-  }
-  return maxDepth;
-}
-
-/// Function to flatten a nested map
-Map<dynamic, dynamic> flattenMap(Map<dynamic, dynamic> map, [String prefix = '']) {
-  Map<dynamic, dynamic> flatMap = {};
-
-  map.forEach((key, value) {
-    if (value is Map) {
-      // Recursively flatten the map and append keys
-      flatMap.addAll(flattenMap(value, '$prefix$key.'));
-    } else {
-      // Add non-map values to flatMap with the full key path
-      flatMap['$prefix$key'] = value;
-    }
-  });
-
-  return flatMap;
-}
-
