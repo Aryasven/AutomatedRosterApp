@@ -47,13 +47,14 @@ class _CreateRosterPageState extends State<CreateRosterPage> {
         String prompt = '''
           Can you create a roster for the following volunteering event? 
 
-          Event Frequency: $eventFrequency
+          Event Details: $eventFrequency
           Start Date: $startDate
           End Date: $endDate
           Volunteer Names: ${volunteerNames.join(', ')}
           No of volunteers needed per event: $numVolunteers
 
-          Try to do equal distributions. Respond with ONLY a JSON as output with the correct headers.
+          Try to do equal distributions. 
+          Respond with list of dictionaries, one for each row. The keys should be all required headers of the table.
           Dont give any other explanation.
         ''';
         final response = await model.generateContent([Content.text(prompt)]);
@@ -96,7 +97,7 @@ class _CreateRosterPageState extends State<CreateRosterPage> {
               controller: _eventFrequencyController,
               decoration: InputDecoration(
                 border: OutlineInputBorder(),
-                labelText: 'Event Frequency',
+                labelText: 'Event details such as timings, venues etc.',
               ),
             ),
             SizedBox(height: 12),
@@ -146,22 +147,21 @@ class _CreateRosterPageState extends State<CreateRosterPage> {
                 );
               },
               child: _loading ? CircularProgressIndicator() : Text('Send'),
-            ),
-            SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: _loading ? null : () {
-                _writeJsonToExcel(_response);
-              },
-              child: _loading ? CircularProgressIndicator() : Text('Save roster to file'),
-            ),
-            
+            ),            
             SizedBox(height: 12),
             Expanded(
               child: SingleChildScrollView(
                 child: ResponseDisplayBox(response: _response),
               ),
             ),
-                        Expanded(
+            SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: _loading ? null : () {
+                _writeJsonToExcel(_response);
+              },
+              child: _loading ? CircularProgressIndicator() : Text('Roster generated. Save roster to file'),
+            ),
+            Expanded(
               child: SingleChildScrollView(
                 child: ResponseDisplayBox(response: _response_save),
               ),
@@ -181,7 +181,7 @@ class _CreateRosterPageState extends State<CreateRosterPage> {
 // 
       // Step 2: Parse the JSON string
       //var parsedJson = json.decode(jsonString);
-      var tableData = json.decode(jsonString); //parsedJson['table'];
+      List tableData = json.decode(jsonString); //parsedJson['table'];
 
       // if (tableData is! Map) {
       //   throw Exception('Expected JSON data to be a map.');
@@ -193,79 +193,45 @@ class _CreateRosterPageState extends State<CreateRosterPage> {
 
       int row=1;
           // Recursive function to traverse the nested map
-      void traverseAndWrite(Map<dynamic, dynamic> map, String currentPath) {
-        map.forEach((key, value) {
-          if (value is Map) {
-            // If the value is a map, go deeper recursively
-            traverseAndWrite(value, currentPath.isEmpty ? '$key' : '$currentPath | $key');
-          } else {
-            // Otherwise, write the current path and value to Excel
-            // Split the fullPath into a list of keys
-            List<String> keysList = currentPath.split('|');
-            // Iterate over the list of keys and set the corresponding Excel columns
-            for (int i = 0; i < keysList.length; i++) {
-              sheet.getRangeByIndex(row, i + 1).setText(keysList[i].trim());
-            }
-            // Set the last column to the value
-            sheet.getRangeByIndex(row, keysList.length + 1).setText('$key');
-            sheet.getRangeByIndex(row, keysList.length + 2).setText(value.toString());
+      traverseAndWrite(List jsonData, xlsio.Worksheet sheet) {
+        if (jsonData is List && jsonData.isNotEmpty && jsonData.first is Map) {
+          // Step 4: Write headers based on the first item in the list (dynamic keys)
+          Map<String, dynamic> firstItem = jsonData.first;
+          int column = 1;
 
-            row++;
+          // Write headers (keys)
+          firstItem.keys.forEach((key) {
+            sheet.getRangeByIndex(1, column).setText(key);
+            column++;
+          });
+
+          // Step 5: Write data rows
+          for (int row = 0; row < jsonData.length; row++) {
+            Map<String, dynamic> currentItem = jsonData[row];
+            column = 1;
+
+            currentItem.forEach((key, value) {
+              sheet.getRangeByIndex(row + 2, column).setText(value.toString());
+              column++;
+            });
           }
-        });
+        }
+        return sheet;
       }
 
       // Start traversing the nested map
-      traverseAndWrite(tableData, '');
+      traverseAndWrite(tableData, sheet);
 
       final directory = await getApplicationDocumentsDirectory();
       String filePath = '${directory.path}/gemini_output_v3.xlsx';
       final List<int> bytes = workbook.saveAsStream();
       File(filePath).writeAsBytesSync(bytes);
-      _response_save = 'Excel file created successfully at: $filePath';
+      
 
-      // storage permission ask
-      // PermissionStatus status = await Permission.manageExternalStorage.request();
-      // if (!status.isGranted) {
-      //   _response_save = 'Permission not granted';
-      // } 
-      // else{
-      //   _response_save = 'Permission granted';}
-      // if (status.isPermanentlyDenied) {
-      //   openAppSettings();
-      // }
-      // int permissionGranted=1;
-      // if (permissionGranted==1) {
-      //   // Open file picker to choose save location
-      //   final result = await FilePicker.platform.saveFile(
-      //     dialogTitle: 'Save Excel File',
-      //     fileName: 'gemini_output.xlsx',
-      //   );
-
-      //   if (result != null) {
-      //     // Save the file
-      //     final List<int> bytes = workbook.saveAsStream();
-      //     File(result).writeAsBytesSync(bytes);
-      //             setState(() {
-      //       _response_save = 'Excel file created successfully at: $result';
-      //     });
-      //   } else {
-      //     setState(() {
-      //       _response_save = 'File save canceled.';
-      //     });
-      //   }
-      // }
-
-      // // Step 6: Get the directory to save the file
-      // final directory = await getApplicationDocumentsDirectory();
-
-      String filePath2 = '/storage/emulated/0/Downloads/gemini_output_v3.xlsx'; //'${directory.path}/gemini_output_v3.xlsx';
+      String filePath2 = '/storage/emulated/0/Download/gemini_output_v3.xlsx'; //'${directory.path}/gemini_output_v3.xlsx';
       final List<int> bytes2 = workbook.saveAsStream();
       File(filePath2).writeAsBytesSync(bytes2);
-
-      // // Step 7: Dispose of the workbook
-      // workbook.dispose();
-
+      _response_save = 'Excel file created successfully at: $filePath2';
       // Show success message
 
     } catch (e) {
