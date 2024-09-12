@@ -1,24 +1,6 @@
 import 'package:flutter/material.dart';
 import 'create_roster_page.dart'; 
-import 'edit_roster_page.dart'
-
-void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-  runApp(MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Gemini API Demo',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: HomePage(),
-    );
-  }
-}
+import 'edit_roster_page.dart';
 
 class HomePage extends StatelessWidget {
   @override

@@ -8,8 +8,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xlsio;
-
-// import 'package:permission_handler/permission_handler.dart'; // Add this for permissions
+import 'package:file_picker/file_picker.dart';
+import 'package:permission_handler/permission_handler.dart'; // Add this for permissions
 
 // const apiEndpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?';
 const apikey = 'AIzaSyCk3FI25_MTfUzrbvgYHKauG-y_Dacobt4';
@@ -34,6 +34,7 @@ class _CreateRosterPageState extends State<CreateRosterPage> {
   final TextEditingController _volunteerNamesController = TextEditingController();
   final TextEditingController _assignNoOfVolunteers = TextEditingController();
   String _response = '';
+  String _response_save = '';
   bool _loading = false;
 
   Future<void> _callGeminiApi(String eventFrequency, String startDate, String endDate, List<String> volunteerNames, String numVolunteers) async {
@@ -52,7 +53,8 @@ class _CreateRosterPageState extends State<CreateRosterPage> {
           Volunteer Names: ${volunteerNames.join(', ')}
           No of volunteers needed per event: $numVolunteers
 
-          Try to do equal distributions. Respond with ONLY a JSON as output and no other explanation.
+          Try to do equal distributions. Respond with ONLY a JSON as output with the correct headers.
+          Dont give any other explanation.
         ''';
         final response = await model.generateContent([Content.text(prompt)]);
         String responseBody = response.text!;
@@ -62,7 +64,7 @@ class _CreateRosterPageState extends State<CreateRosterPage> {
         });
 
         // Save the response to a JSON file
-        await _writeJsonToExcel();
+        // await _writeJsonToExcel(_response);
       // } else {
       //   setState(() {
       //     _response = 'Failed to get a response from Gemini API. Status code: ${response.statusCode}\nResponse body: ${response.body}';
@@ -146,9 +148,22 @@ class _CreateRosterPageState extends State<CreateRosterPage> {
               child: _loading ? CircularProgressIndicator() : Text('Send'),
             ),
             SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: _loading ? null : () {
+                _writeJsonToExcel(_response);
+              },
+              child: _loading ? CircularProgressIndicator() : Text('Save roster to file'),
+            ),
+            
+            SizedBox(height: 12),
             Expanded(
               child: SingleChildScrollView(
                 child: ResponseDisplayBox(response: _response),
+              ),
+            ),
+                        Expanded(
+              child: SingleChildScrollView(
+                child: ResponseDisplayBox(response: _response_save),
               ),
             ),
           ],
@@ -159,18 +174,18 @@ class _CreateRosterPageState extends State<CreateRosterPage> {
 
 
 
-  Future<void> _writeJsonToExcel() async {
+  Future<void> _writeJsonToExcel(response) async {
     try {
       // Step 1: Extract the JSON part from the response
-      String jsonString = _response;
+      String jsonString = response;
 // 
       // Step 2: Parse the JSON string
       //var parsedJson = json.decode(jsonString);
       var tableData = json.decode(jsonString); //parsedJson['table'];
 
-      if (tableData is! Map) {
-        throw Exception('Expected JSON data to be a map.');
-      }
+      // if (tableData is! Map) {
+      //   throw Exception('Expected JSON data to be a map.');
+      // }
 
       // Step 3: Create a new Excel document using Syncfusion XlsIO
       final xlsio.Workbook workbook = xlsio.Workbook();
@@ -203,23 +218,60 @@ class _CreateRosterPageState extends State<CreateRosterPage> {
       // Start traversing the nested map
       traverseAndWrite(tableData, '');
 
-      // Step 6: Get the directory to save the file
       final directory = await getApplicationDocumentsDirectory();
       String filePath = '${directory.path}/gemini_output_v3.xlsx';
       final List<int> bytes = workbook.saveAsStream();
       File(filePath).writeAsBytesSync(bytes);
+      _response_save = 'Excel file created successfully at: $filePath';
 
-      // Step 7: Dispose of the workbook
-      workbook.dispose();
+      // storage permission ask
+      // PermissionStatus status = await Permission.manageExternalStorage.request();
+      // if (!status.isGranted) {
+      //   _response_save = 'Permission not granted';
+      // } 
+      // else{
+      //   _response_save = 'Permission granted';}
+      // if (status.isPermanentlyDenied) {
+      //   openAppSettings();
+      // }
+      // int permissionGranted=1;
+      // if (permissionGranted==1) {
+      //   // Open file picker to choose save location
+      //   final result = await FilePicker.platform.saveFile(
+      //     dialogTitle: 'Save Excel File',
+      //     fileName: 'gemini_output.xlsx',
+      //   );
+
+      //   if (result != null) {
+      //     // Save the file
+      //     final List<int> bytes = workbook.saveAsStream();
+      //     File(result).writeAsBytesSync(bytes);
+      //             setState(() {
+      //       _response_save = 'Excel file created successfully at: $result';
+      //     });
+      //   } else {
+      //     setState(() {
+      //       _response_save = 'File save canceled.';
+      //     });
+      //   }
+      // }
+
+      // // Step 6: Get the directory to save the file
+      // final directory = await getApplicationDocumentsDirectory();
+
+      String filePath2 = '/storage/emulated/0/Downloads/gemini_output_v3.xlsx'; //'${directory.path}/gemini_output_v3.xlsx';
+      final List<int> bytes2 = workbook.saveAsStream();
+      File(filePath2).writeAsBytesSync(bytes2);
+
+      // // Step 7: Dispose of the workbook
+      // workbook.dispose();
 
       // Show success message
-      setState(() {
-        _response = 'Excel file created successfully at: $filePath';
-      });
+
     } catch (e) {
       setState(() {
         print('Error: $e');
-        // _response = 'Error: $e';
+        _response_save = 'Error: $e';
       });
     }
   }
